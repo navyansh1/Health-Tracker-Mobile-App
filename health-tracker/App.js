@@ -1042,25 +1042,29 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={theme}>
-        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.bg }]}>
-          <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-          {screen === "home" ? HomeScreen() :
-            screen === "login" ? <LoginScreen /> :
-              screen === "reports" ? <ReportsScreen meals={meals} dailyGoals={dailyGoals} themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} /> :
-                screen === "goalPlanning" ? <GoalPlanningScreen themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} dailyGoals={dailyGoals} onUpdateGoals={handleUpdateGoals} setDailyGoals={setDailyGoals} /> :
-                  screen === "privacy" ? <PrivacyPolicyScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
-                    screen === "terms" ? <TermsScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
-                      SettingsScreen()}
+      <View style={Platform.OS === 'web' ? { flex: 1, backgroundColor: '#1C1917', alignItems: 'center', justifyContent: 'center' } : { flex: 1 }}>
+        <View style={Platform.OS === 'web' ? { width: '100%', maxWidth: 480, height: '100%', overflow: 'hidden', backgroundColor: themeColors.bg, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 } : { flex: 1 }}>
+          <PaperProvider theme={theme}>
+            <SafeAreaView style={[styles.container, { backgroundColor: themeColors.bg }]}>
+              <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+              {screen === "home" ? HomeScreen() :
+                screen === "login" ? <LoginScreen /> :
+                  screen === "reports" ? <ReportsScreen meals={meals} dailyGoals={dailyGoals} themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} /> :
+                    screen === "goalPlanning" ? <GoalPlanningScreen themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} dailyGoals={dailyGoals} onUpdateGoals={handleUpdateGoals} setDailyGoals={setDailyGoals} /> :
+                      screen === "privacy" ? <PrivacyPolicyScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
+                        screen === "terms" ? <TermsScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
+                          SettingsScreen()}
 
-          <EditModal visible={editModal} editItem={editItem} setEditItem={setEditItem} onClose={handleCloseEditModal} onSave={saveEdit} onDelete={deleteMeal} themeColors={themeColors} isDarkMode={isDarkMode} />
-          <ProcessingOverlay visible={isProcessing} status={processingStatus} themeColors={themeColors} />
-          <NutritionDetailModal visible={showNutritionModal} onClose={() => setShowNutritionModal(false)} totals={todaysTotals} goals={dailyGoals} themeColors={themeColors} />
-          <ScoreDetailModal visible={showScoreModal} onClose={() => setShowScoreModal(false)} scoreData={healthScoreData} themeColors={themeColors} />
-          <StreakDetailModal visible={showStreakModal} onClose={() => setShowStreakModal(false)} streakData={streakData} themeColors={themeColors} />
-          <HowToUseModal visible={showHowToUse} onClose={() => setShowHowToUse(false)} themeColors={themeColors} />
-        </SafeAreaView>
-      </PaperProvider>
+              <EditModal visible={editModal} editItem={editItem} setEditItem={setEditItem} onClose={handleCloseEditModal} onSave={saveEdit} onDelete={deleteMeal} themeColors={themeColors} isDarkMode={isDarkMode} />
+              <ProcessingOverlay visible={isProcessing} status={processingStatus} themeColors={themeColors} />
+              <NutritionDetailModal visible={showNutritionModal} onClose={() => setShowNutritionModal(false)} totals={todaysTotals} goals={dailyGoals} themeColors={themeColors} />
+              <ScoreDetailModal visible={showScoreModal} onClose={() => setShowScoreModal(false)} scoreData={healthScoreData} themeColors={themeColors} />
+              <StreakDetailModal visible={showStreakModal} onClose={() => setShowStreakModal(false)} streakData={streakData} themeColors={themeColors} />
+              <HowToUseModal visible={showHowToUse} onClose={() => setShowHowToUse(false)} themeColors={themeColors} />
+            </SafeAreaView>
+          </PaperProvider>
+        </View>
+      </View>
     </SafeAreaProvider>
   );
 }

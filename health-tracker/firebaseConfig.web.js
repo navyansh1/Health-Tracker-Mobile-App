@@ -1,12 +1,7 @@
-// Firebase Configuration for NutriSnap (Native)
-// Replace these values with your own Firebase project credentials
-// See README.md for complete setup instructions
-
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getAuth, browserLocalPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ⚠️ REPLACE THESE VALUES WITH YOUR OWN FIREBASE CONFIG
 // Get these from Firebase Console → Project Settings → Your Apps → Web App
@@ -22,11 +17,11 @@ const firebaseConfig = {
 // Initialize Firebase (only if not already initialized)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firebase Auth with proper persistence for NATIVE
+// Initialize Firebase Auth with proper persistence for WEB
 let auth;
 try {
     auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage)
+        persistence: browserLocalPersistence
     });
 } catch (error) {
     // Auth already initialized, get existing instance
