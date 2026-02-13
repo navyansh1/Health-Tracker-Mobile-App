@@ -15,6 +15,7 @@ import {
     saveWeightEntry, getWeightEntries, deleteWeightEntry,
     saveUserPreferences, getUserPreferences,
 } from "../firestoreService";
+import { ArrowLeft, TrendingDown, TrendingUp, Minus, Heart, Activity } from "lucide-react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_WIDTH = SCREEN_WIDTH - 48;
@@ -23,10 +24,10 @@ const CHART_WIDTH = SCREEN_WIDTH - 48;
 // CONSTANTS
 // ============================================================================
 const FITNESS_GOALS = [
-    { id: "lose_weight", label: "Lose Weight", description: "Calorie deficit for fat loss", icon: "(-)" },
-    { id: "build_muscle", label: "Build Muscle", description: "Calorie surplus for muscle gain", icon: "(+)" },
-    { id: "maintain", label: "Maintain Weight", description: "Stay at your current weight", icon: "(=)" },
-    { id: "general_health", label: "General Health", description: "Balanced nutrition focus", icon: "(*)" },
+    { id: "lose_weight", label: "Lose Weight", description: "Calorie deficit for fat loss", icon: TrendingDown, color: "#EF4444" },
+    { id: "build_muscle", label: "Build Muscle", description: "Calorie surplus for muscle gain", icon: TrendingUp, color: "#8B5CF6" },
+    { id: "maintain", label: "Maintain Weight", description: "Stay at your current weight", icon: Minus, color: "#10B981" },
+    { id: "general_health", label: "General Health", description: "Balanced nutrition focus", icon: Heart, color: "#F59E0B" },
 ];
 
 const ACTIVITY_LEVELS = [
@@ -275,7 +276,7 @@ export default function GoalPlanningScreen({ themeColors, isDarkMode, onBack, da
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <Text style={[styles.backText, { color: themeColors.primary, fontSize: 22 }]}>←</Text>
+                        <ArrowLeft size={24} color={themeColors.primary} />
                     </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: themeColors.text }]}>Goal Planning</Text>
                     <View style={{ width: 50 }} />
@@ -364,9 +365,9 @@ export default function GoalPlanningScreen({ themeColors, isDarkMode, onBack, da
                                         ]}
                                         onPress={() => setPlan(prev => ({ ...prev, fitnessGoal: goal.id }))}
                                     >
-                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: plan.fitnessGoal === goal.id ? "#FFF" : themeColors.text }}>
-                                            {goal.icon}
-                                        </Text>
+                                        <View style={{ marginBottom: 8 }}>
+                                            <goal.icon size={28} color={plan.fitnessGoal === goal.id ? "#FFF" : goal.color} />
+                                        </View>
                                         <Text style={[styles.optionLabel, { color: plan.fitnessGoal === goal.id ? "#FFF" : themeColors.text }]}>
                                             {goal.label}
                                         </Text>
@@ -520,9 +521,10 @@ export default function GoalPlanningScreen({ themeColors, isDarkMode, onBack, da
                                 </View>
 
                                 <TouchableOpacity
-                                    style={[styles.applyButton, { backgroundColor: themeColors.primary }]}
+                                    style={[styles.applyButton, { overflow: 'hidden' }]}
                                     onPress={handleApplyTargets}
                                 >
+                                    <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
                                     <Text style={{ color: "#FFF", fontWeight: "bold", fontSize: 15 }}>Apply to My Daily Goals</Text>
                                 </TouchableOpacity>
                             </View>
@@ -530,10 +532,11 @@ export default function GoalPlanningScreen({ themeColors, isDarkMode, onBack, da
 
                         {/* Save Button */}
                         <TouchableOpacity
-                            style={[styles.saveButton, { backgroundColor: themeColors.primary }]}
+                            style={[styles.saveButton, { overflow: 'hidden' }]}
                             onPress={handleSavePlan}
                             disabled={saving}
                         >
+                            <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
                             <Text style={{ color: "#FFF", fontWeight: "bold", fontSize: 16 }}>
                                 {saving ? "Saving..." : "Save Plan"}
                             </Text>
@@ -564,9 +567,10 @@ export default function GoalPlanningScreen({ themeColors, isDarkMode, onBack, da
                                         autoFocus
                                     />
                                     <TouchableOpacity
-                                        style={[styles.weightSaveBtn, { backgroundColor: themeColors.primary }]}
+                                        style={[styles.weightSaveBtn, { overflow: 'hidden' }]}
                                         onPress={handleAddWeight}
                                     >
+                                        <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
                                         <Text style={{ color: "#FFF", fontWeight: "600" }}>Save</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity

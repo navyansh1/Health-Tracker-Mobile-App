@@ -4,14 +4,26 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   View, StyleSheet, ScrollView, Modal, TouchableOpacity, Platform,
-  StatusBar, Alert, Image, Dimensions, KeyboardAvoidingView, TextInput,
+  StatusBar, Alert, Image, Dimensions, KeyboardAvoidingView, TextInput, Switch,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import {
   Provider as PaperProvider, Text, ActivityIndicator,
   MD3LightTheme, MD3DarkTheme,
 } from "react-native-paper";
+import {
+  Camera, Image as LucideImage, Settings, BarChart2, Target,
+  Flame, Dumbbell, Wheat, Droplets, Trophy, Calendar,
+  UtensilsCrossed, ChevronRight, Check, X,
+  ArrowLeft, Eye, EyeOff, Lock, Mail, User,
+  PieChart as PieChartIcon, Activity, Leaf,
+  Sunrise, Sun, Moon, Coffee, LayoutGrid, Pizza, IceCream, Utensils,
+  TrendingUp, TrendingDown, Minus, Heart,
+  ShieldCheck, FileText, HelpCircle, LogOut, Trash2, Lightbulb
+} from "lucide-react-native";
+import CategoryFilter from "./components/CategoryFilter";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { analyzeFood } from "./lib/gemini";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { format, subDays, startOfDay, isAfter, parseISO, isBefore, isToday } from "date-fns";
@@ -27,10 +39,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { calculateStreakData, getStreakStatusMessage, hasLoggedToday as checkLoggedToday } from "./services/streakService";
 import { calculateHealthScore, getScoreLabel } from "./services/healthScoreService";
 import { generateWeeklyInsights } from "./services/insightsService";
-import {
-  requestNotificationPermissions, getNotificationSettings, setNotificationSettings,
-  checkAndTriggerReminders, cancelAllNotifications, scheduleFixedDailyReminders,
-} from "./services/notificationService";
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 import ReportsScreen from "./screens/ReportsScreen";
 import GoalPlanningScreen from "./screens/GoalPlanningScreen";
 import PrivacyPolicyScreen from "./screens/PrivacyPolicyScreen";
@@ -39,22 +48,26 @@ import TermsScreen from "./screens/TermsScreen";
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-const MEAL_TYPE_EMOJIS = { Breakfast: "🌅", Lunch: "☀️", Dinner: "🌙", Snack: "🍿" };
+// CONSTANTS
+// ============================================================================
+const MEAL_FILTERS = [
+  { value: "All", label: "All", icon: "LayoutGrid", color: "#6366F1" },
+  { value: "Breakfast", label: "Breakfast", icon: "Coffee", color: "#F59E0B" },
+  { value: "Lunch", label: "Lunch", icon: "Utensils", color: "#10B981" },
+  { value: "Dinner", label: "Dinner", icon: "Pizza", color: "#F97316" },
+  { value: "Snack", label: "Snack", icon: "IceCream", color: "#EC4899" },
+];
 const MEAL_TYPES = ["Breakfast", "Lunch", "Dinner", "Snack"];
 const DATE_FILTERS = ["Today", "This Week", "This Month", "All Time"];
 const DEFAULT_GOALS = { calories: 2000, protein: 50, carbs: 250, fat: 65 };
 
 const THEMES = {
-  "Warm Sunset": { primary: "#F97316", primaryDark: "#F97316", gradient: ["#F97316", "#EA580C"], gradientDark: ["#F97316", "#C2410C"], bgLight: "#FFF7ED", bgDark: "#1C1917", cardDark: "#292524", chipDark: "#44403C" },
-  "Rose Pink": { primary: "#EC4899", primaryDark: "#EC4899", gradient: ["#EC4899", "#DB2777"], gradientDark: ["#EC4899", "#BE185D"], bgLight: "#FDF2F8", bgDark: "#1A0A14", cardDark: "#2D1A24", chipDark: "#4A2639" },
-  "Golden Amber": { primary: "#D97706", primaryDark: "#D97706", gradient: ["#F59E0B", "#D97706"], gradientDark: ["#F59E0B", "#B45309"], bgLight: "#FFFBEB", bgDark: "#1A1408", cardDark: "#2A2010", chipDark: "#4A3820" },
-  "Lavender Dream": { primary: "#A78BFA", primaryDark: "#A78BFA", gradient: ["#C4B5FD", "#A78BFA"], gradientDark: ["#A78BFA", "#8B5CF6"], bgLight: "#F5F3FF", bgDark: "#1A1625", cardDark: "#2D2540", chipDark: "#3D3555" },
-  "Coral Blush": { primary: "#FB7185", primaryDark: "#FB7185", gradient: ["#FDA4AF", "#FB7185"], gradientDark: ["#FB7185", "#F43F5E"], bgLight: "#FFF1F2", bgDark: "#1A0F10", cardDark: "#2D1E20", chipDark: "#4A3035" },
-  "Teal Mint": { primary: "#14B8A6", primaryDark: "#14B8A6", gradient: ["#2DD4BF", "#14B8A6"], gradientDark: ["#14B8A6", "#0D9488"], bgLight: "#F0FDFA", bgDark: "#0A1A18", cardDark: "#1A2D2A", chipDark: "#264540" },
-  "Midnight Blue": { primary: "#6366F1", primaryDark: "#818CF8", gradient: ["#6366F1", "#4F46E5"], gradientDark: ["#818CF8", "#4338CA"], bgLight: "#EEF2FF", bgDark: "#0F172A", cardDark: "#1E293B", chipDark: "#334155" },
-  "Sage Wisdom": { primary: "#84CC16", primaryDark: "#A3E635", gradient: ["#84CC16", "#65A30D"], gradientDark: ["#A3E635", "#4D7C0F"], bgLight: "#F7FEE7", bgDark: "#141D08", cardDark: "#22330E", chipDark: "#365314" },
-  "Berry Punch": { primary: "#D946EF", primaryDark: "#E879F9", gradient: ["#D946EF", "#C026D3"], gradientDark: ["#E879F9", "#A21CAF"], bgLight: "#FDF4FF", bgDark: "#2E1035", cardDark: "#4A1D57", chipDark: "#702488" },
-  "Ocean Breeze": { primary: "#06B6D4", primaryDark: "#22D3EE", gradient: ["#06B6D4", "#0891B2"], gradientDark: ["#22D3EE", "#0E7490"], bgLight: "#ECFEFF", bgDark: "#082F49", cardDark: "#0C4A6E", chipDark: "#164E63" },
+  "Warm Sunset": { primary: "#F97316", primaryDark: "#F97316", gradient: ["#F97316", "#EC4899", "#1E1B4B"], gradientDark: ["#F97316", "#C2410C"], bgLight: "#FFF7ED", bgDark: "#1C1917", cardDark: "#292524", chipDark: "#44403C" },
+  "Rose Pink": { primary: "#EC4899", primaryDark: "#EC4899", gradient: ["#EC4899", "#8B5CF6", "#083344"], gradientDark: ["#EC4899", "#BE185D"], bgLight: "#FDF2F8", bgDark: "#1A0A14", cardDark: "#2D1A24", chipDark: "#4A2639" },
+  "Golden Amber": { primary: "#D97706", primaryDark: "#D97706", gradient: ["#F59E0B", "#10B981", "#450A0A"], gradientDark: ["#F59E0B", "#B45309"], bgLight: "#FFFBEB", bgDark: "#1A1408", cardDark: "#2A2010", chipDark: "#4A3820" },
+  "Lavender Dream": { primary: "#A78BFA", primaryDark: "#A78BFA", gradient: ["#8B5CF6", "#3B82F6", "#422006"], gradientDark: ["#A78BFA", "#8B5CF6"], bgLight: "#F5F3FF", bgDark: "#1A1625", cardDark: "#2D2540", chipDark: "#3D3555" },
+  "Coral Blush": { primary: "#FB7185", primaryDark: "#FB7185", gradient: ["#FB7185", "#0EA5E9", "#1A2E05"], gradientDark: ["#FB7185", "#F43F5E"], bgLight: "#FFF1F2", bgDark: "#1A0F10", cardDark: "#2D1E20", chipDark: "#4A3035" },
+  "Teal Mint": { primary: "#14B8A6", primaryDark: "#14B8A6", gradient: ["#14B8A6", "#F59E0B", "#2E1065"], gradientDark: ["#14B8A6", "#0D9488"], bgLight: "#F0FDFA", bgDark: "#0A1A18", cardDark: "#1A2D2A", chipDark: "#264540" },
 };
 const THEME_NAMES = Object.keys(THEMES);
 
@@ -117,7 +130,7 @@ const HealthScoreCard = React.memo(({ score, label, themeColors, onPress }) => (
 // Streak Card
 const StreakCard = React.memo(({ currentStreak, bestStreak, themeColors, onPress }) => (
   <TouchableOpacity style={[styles.streakCard, { backgroundColor: themeColors.card }]} onPress={onPress} activeOpacity={0.7}>
-    <Text style={{ fontSize: 22 }}>🔥</Text>
+    <Flame size={24} color="#F59E0B" />
     <View style={{ marginLeft: 8, flex: 1 }}>
       <Text style={{ color: themeColors.text, fontSize: 13, fontWeight: '600' }}>{currentStreak} Day Streak</Text>
       <Text style={{ color: themeColors.subText, fontSize: 11 }}>Best: {bestStreak}</Text>
@@ -125,14 +138,46 @@ const StreakCard = React.memo(({ currentStreak, bestStreak, themeColors, onPress
   </TouchableOpacity>
 ));
 
+// Gradient Text Component
+const GradientText = ({ text, fontSize = 24, style, colors = ["#F97316", "#EA580C"], center = false }) => {
+  const width = fontSize * 7;
+  return (
+    <View style={style}>
+      <Svg height={fontSize * 1.4} width={width} viewBox={`0 0 ${width} ${fontSize * 1.4}`}>
+        <Defs>
+          <SvgGradient id={`textGrad-${text}`} x1="0" y1="0" x2="1" y2="0">
+            {colors.map((color, index) => (
+              <Stop
+                key={index}
+                offset={index / (colors.length - 1)}
+                stopColor={color}
+              />
+            ))}
+          </SvgGradient>
+        </Defs>
+        <SvgText
+          fill={`url(#textGrad-${text})`}
+          fontSize={fontSize}
+          fontWeight="bold"
+          x={center ? width / 2 : 0}
+          y={fontSize}
+          textAnchor={center ? "middle" : "start"}
+        >
+          {text}
+        </SvgText>
+      </Svg>
+    </View>
+  );
+};
+
 // Today's Nutrition Detail Modal
 const NutritionDetailModal = React.memo(({ visible, onClose, totals, goals, themeColors }) => {
   if (!visible) return null;
   const items = [
-    { label: "Calories", emoji: "🔥", value: totals.calories, goal: goals.calories, unit: "cal", color: "#EF4444" },
-    { label: "Protein", emoji: "💪", value: totals.protein, goal: goals.protein, unit: "g", color: "#8B5CF6" },
-    { label: "Carbs", emoji: "🍞", value: totals.carbs, goal: goals.carbs, unit: "g", color: "#F59E0B" },
-    { label: "Fat", emoji: "🧈", value: totals.fat, goal: goals.fat, unit: "g", color: "#EC4899" },
+    { label: "Calories", icon: Flame, value: totals.calories, goal: goals.calories, unit: "cal", color: "#EF4444" },
+    { label: "Protein", icon: Dumbbell, value: totals.protein, goal: goals.protein, unit: "g", color: "#8B5CF6" },
+    { label: "Carbs", icon: Wheat, value: totals.carbs, goal: goals.carbs, unit: "g", color: "#F59E0B" },
+    { label: "Fat", icon: Droplets, value: totals.fat, goal: goals.fat, unit: "g", color: "#EC4899" },
   ];
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -144,7 +189,7 @@ const NutritionDetailModal = React.memo(({ visible, onClose, totals, goals, them
             const status = percent >= 90 && percent <= 110 ? "On target" : percent < 90 ? `${Math.round(item.goal - item.value)} ${item.unit} left` : "Over target";
             return (
               <View key={item.label} style={[styles.nutritionDetailRow, { backgroundColor: themeColors.chip }]}>
-                <Text style={{ fontSize: 20, marginRight: 10 }}>{item.emoji}</Text>
+                <item.icon size={24} color={item.color} style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ color: themeColors.text, fontWeight: '600', fontSize: 14 }}>{item.label}</Text>
@@ -158,7 +203,8 @@ const NutritionDetailModal = React.memo(({ visible, onClose, totals, goals, them
               </View>
             );
           })}
-          <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: themeColors.primary }]} onPress={onClose}>
+          <TouchableOpacity style={[styles.modalCloseBtn, { overflow: 'hidden' }]} onPress={onClose}>
+            <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
             <Text style={{ color: '#FFF', fontWeight: '600' }}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -181,7 +227,7 @@ const ScoreDetailModal = React.memo(({ visible, onClose, scoreData, themeColors 
           </View>
           <Text style={{ color: label.color, textAlign: 'center', fontSize: 16, marginBottom: 16, fontWeight: '600' }}>{label.label}</Text>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 18, marginRight: 10 }}>🔥</Text>
+            <Flame size={20} color="#EF4444" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: themeColors.text, fontWeight: '600' }}>Calorie Goal</Text>
               <Text style={{ color: themeColors.subText, fontSize: 11 }}>Stay close to your target</Text>
@@ -189,7 +235,7 @@ const ScoreDetailModal = React.memo(({ visible, onClose, scoreData, themeColors 
             <Text style={{ color: themeColors.primary, fontWeight: 'bold' }}>{breakdown?.calories || 0}/40</Text>
           </View>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 18, marginRight: 10 }}>💪</Text>
+            <Dumbbell size={20} color="#8B5CF6" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: themeColors.text, fontWeight: '600' }}>Protein Goal</Text>
               <Text style={{ color: themeColors.subText, fontSize: 11 }}>Meet your protein intake</Text>
@@ -197,14 +243,15 @@ const ScoreDetailModal = React.memo(({ visible, onClose, scoreData, themeColors 
             <Text style={{ color: themeColors.primary, fontWeight: 'bold' }}>{breakdown?.protein || 0}/35</Text>
           </View>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 18, marginRight: 10 }}>📊</Text>
+            <Activity size={20} color="#10B981" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: themeColors.text, fontWeight: '600' }}>Consistency</Text>
               <Text style={{ color: themeColors.subText, fontSize: 11 }}>Meals logged + streak</Text>
             </View>
             <Text style={{ color: themeColors.primary, fontWeight: 'bold' }}>{breakdown?.consistency || 0}/25</Text>
           </View>
-          <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: themeColors.primary }]} onPress={onClose}>
+          <TouchableOpacity style={[styles.modalCloseBtn, { overflow: 'hidden' }]} onPress={onClose}>
+            <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
             <Text style={{ color: '#FFF', fontWeight: '600' }}>Got it</Text>
           </TouchableOpacity>
         </View>
@@ -223,20 +270,20 @@ const StreakDetailModal = React.memo(({ visible, onClose, streakData, themeColor
         <View style={[styles.detailModalContent, { backgroundColor: themeColors.card }]}>
           <Text style={[styles.modalTitle, { color: themeColors.text }]}>🔥 Streak Details</Text>
           <View style={{ alignItems: 'center', marginVertical: 16 }}>
-            <Text style={{ fontSize: 48 }}>🔥</Text>
+            <Flame size={48} color="#F59E0B" />
             <Text style={{ color: themeColors.text, fontSize: 28, fontWeight: 'bold' }}>{currentStreak} Days</Text>
             <Text style={{ color: themeColors.subText }}>Best: {bestStreak} days</Text>
           </View>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 16, marginRight: 10 }}>✅</Text>
+            <Check size={20} color="#10B981" style={{ marginRight: 12 }} />
             <Text style={{ flex: 1, color: themeColors.text, fontSize: 13 }}>Log 1+ meal = streak continues</Text>
           </View>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 16, marginRight: 10 }}>⏸️</Text>
+            <Coffee size={20} color="#F59E0B" style={{ marginRight: 12 }} />
             <Text style={{ flex: 1, color: themeColors.text, fontSize: 13 }}>Miss 1 day = paused (can resume)</Text>
           </View>
           <View style={[styles.breakdownItem, { backgroundColor: themeColors.chip }]}>
-            <Text style={{ fontSize: 16, marginRight: 10 }}>💔</Text>
+            <X size={20} color="#EF4444" style={{ marginRight: 12 }} />
             <Text style={{ flex: 1, color: themeColors.text, fontSize: 13 }}>Miss 2 days = resets to 0</Text>
           </View>
           {badges.length > 0 && (
@@ -245,13 +292,15 @@ const StreakDetailModal = React.memo(({ visible, onClose, streakData, themeColor
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {badges.map((b, i) => (
                   <View key={i} style={[styles.badge, { backgroundColor: themeColors.chip }]}>
-                    <Text style={{ color: themeColors.text }}>{b.emoji} {b.name}</Text>
+                    <Trophy size={14} color={themeColors.primary} style={{ marginRight: 4 }} />
+                    <Text style={{ color: themeColors.text }}>{b.name}</Text>
                   </View>
                 ))}
               </View>
             </>
           )}
-          <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: themeColors.primary }]} onPress={onClose}>
+          <TouchableOpacity style={[styles.modalCloseBtn, { overflow: 'hidden' }]} onPress={onClose}>
+            <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
             <Text style={{ color: '#FFF', fontWeight: '600' }}>Got it</Text>
           </TouchableOpacity>
         </View>
@@ -264,12 +313,12 @@ const StreakDetailModal = React.memo(({ visible, onClose, streakData, themeColor
 const HowToUseModal = React.memo(({ visible, onClose, themeColors }) => {
   if (!visible) return null;
   const steps = [
-    { emoji: "📷", title: "Snap a Photo", text: "Use camera or gallery to capture your food." },
-    { emoji: "🤖", title: "AI Analyzes", text: "Calories, protein, carbs, and fat are detected automatically." },
-    { emoji: "📊", title: "Track Progress", text: "Tap the progress bar for a detailed nutrition breakdown." },
-    { emoji: "📈", title: "View Reports", text: "Check trends, charts, and personalized suggestions." },
-    { emoji: "🎯", title: "Set Goals", text: "Use Goal Planning for personalized calorie targets." },
-    { emoji: "✏️", title: "Edit Meals", text: "Long-press any meal card to edit or delete it." },
+    { icon: Camera, title: "Snap a Photo", text: "Use camera or gallery to capture your food.", color: "#3B82F6" },
+    { icon: Activity, title: "AI Analyzes", text: "Calories, protein, carbs, and fat are detected automatically.", color: "#8B5CF6" },
+    { icon: BarChart2, title: "Track Progress", text: "Tap the progress bar for a detailed nutrition breakdown.", color: "#10B981" },
+    { icon: TrendingUp, title: "View Reports", text: "Check trends, charts, and personalized suggestions.", color: "#F59E0B" },
+    { icon: Target, title: "Set Goals", text: "Use Goal Planning for personalized calorie targets.", color: "#EF4444" },
+    { icon: Utensils, title: "Edit Meals", text: "Long-press any meal card to edit or delete it.", color: "#EC4899" },
   ];
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -279,7 +328,7 @@ const HowToUseModal = React.memo(({ visible, onClose, themeColors }) => {
           <ScrollView showsVerticalScrollIndicator={false}>
             {steps.map((s, i) => (
               <View key={i} style={[styles.howToStep, { backgroundColor: themeColors.chip }]}>
-                <Text style={{ fontSize: 22, marginRight: 12 }}>{s.emoji}</Text>
+                <s.icon size={24} color={s.color} style={{ marginRight: 16 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: themeColors.text, fontWeight: '600', fontSize: 14 }}>{s.title}</Text>
                   <Text style={{ color: themeColors.subText, fontSize: 13 }}>{s.text}</Text>
@@ -287,7 +336,8 @@ const HowToUseModal = React.memo(({ visible, onClose, themeColors }) => {
               </View>
             ))}
           </ScrollView>
-          <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: themeColors.primary }]} onPress={onClose}>
+          <TouchableOpacity style={[styles.modalCloseBtn, { overflow: 'hidden' }]} onPress={onClose}>
+            <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
             <Text style={{ color: '#FFF', fontWeight: '600' }}>Got it</Text>
           </TouchableOpacity>
         </View>
@@ -357,7 +407,8 @@ const EditModal = React.memo(({ visible, editItem, setEditItem, onClose, onSave,
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: themeColors.chip }]} onPress={onClose}>
                 <Text style={{ color: themeColors.text }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: themeColors.primary }]} onPress={onSave}>
+              <TouchableOpacity style={[styles.modalBtn, { overflow: 'hidden' }]} onPress={onSave}>
+                <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
                 <Text style={{ color: "#FFF", fontWeight: "bold" }}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -372,7 +423,8 @@ const EditModal = React.memo(({ visible, editItem, setEditItem, onClose, onSave,
           <View style={styles.fullImageContainer}>
             {editItem?.photoUrl && <Image source={{ uri: editItem.photoUrl }} style={styles.fullImage} resizeMode="contain" />}
             <TouchableOpacity style={styles.closeImageBtn} onPress={() => setShowFullImage(false)}>
-              <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "bold" }}>✕ Close</Text>
+              <X size={20} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "bold" }}>Close</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -403,10 +455,10 @@ export default function App() {
   const [showHowToUse, setShowHowToUse] = useState(false);
   const [expandedMealId, setExpandedMealId] = useState(null);
   const [saveFoodPhotos, setSaveFoodPhotos] = useState(true);
-  const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showInsights, setShowInsights] = useState(true);
   const isInitialLoad = useRef(true);
   const preferencesLoaded = useRef(false);
   const savePrefsTimeoutRef = useRef(null);
@@ -427,6 +479,17 @@ export default function App() {
   const theme = useMemo(() => isDarkMode
     ? { ...MD3DarkTheme, colors: { ...MD3DarkTheme.colors, primary: currentTheme.primaryDark, background: currentTheme.bgDark, surface: currentTheme.cardDark } }
     : { ...MD3LightTheme, colors: { ...MD3LightTheme.colors, primary: currentTheme.primary, background: currentTheme.bgLight, surface: "#FFFFFF" } }, [isDarkMode, currentTheme]);
+
+  // Derived Values
+  const getMealIconName = (type) => {
+    switch (type) {
+      case "Breakfast": return "Coffee";
+      case "Lunch": return "Utensils";
+      case "Dinner": return "Pizza";
+      case "Snack": return "IceCream";
+      default: return "Utensils";
+    }
+  };
 
   // Filtered meals
   const filteredMeals = useMemo(() => {
@@ -462,15 +525,15 @@ export default function App() {
     if (savePrefsTimeoutRef.current) clearTimeout(savePrefsTimeoutRef.current);
     savePrefsTimeoutRef.current = setTimeout(savePrefs, 1000);
     return () => { if (savePrefsTimeoutRef.current) clearTimeout(savePrefsTimeoutRef.current); };
-  }, [themeColor, dailyGoals, saveFoodPhotos, remindersEnabled]);
-  useEffect(() => { if (user && remindersEnabled) checkAndTriggerReminders({ meals, dailyGoals, currentStreak: streakData.currentStreak }); }, [meals, remindersEnabled, user]);
+  }, [themeColor, dailyGoals, saveFoodPhotos]);
+  useEffect(() => { if (!user) return; }, [user]);
 
   function savePrefs() {
     if (!user || isInitialLoad.current) return;
-    const cur = JSON.stringify({ themeColor, dailyGoals, saveFoodPhotos, remindersEnabled });
+    const cur = JSON.stringify({ themeColor, dailyGoals, saveFoodPhotos });
     if (cur === lastSavedPrefs.current) return;
     lastSavedPrefs.current = cur;
-    saveUserPreferences({ themeColor, dailyGoals, saveFoodPhotos, remindersEnabled });
+    saveUserPreferences({ themeColor, dailyGoals, saveFoodPhotos });
   }
 
   async function loadUserData() {
@@ -482,14 +545,9 @@ export default function App() {
         if (p.themeColor && THEMES[p.themeColor]) setThemeColor(p.themeColor);
         if (p.dailyGoals) setDailyGoals(p.dailyGoals);
         if (p.saveFoodPhotos !== undefined) setSaveFoodPhotos(p.saveFoodPhotos);
-        if (p.remindersEnabled !== undefined) setRemindersEnabled(p.remindersEnabled);
+        if (p.saveFoodPhotos !== undefined) setSaveFoodPhotos(p.saveFoodPhotos);
 
-        // Ensure recurring notifications are scheduled if enabled
-        if (p.remindersEnabled) {
-          scheduleFixedDailyReminders();
-        }
-
-        lastSavedPrefs.current = JSON.stringify({ themeColor: p.themeColor || "Warm Sunset", dailyGoals: p.dailyGoals || DEFAULT_GOALS, saveFoodPhotos: p.saveFoodPhotos !== undefined ? p.saveFoodPhotos : true, remindersEnabled: p.remindersEnabled || false });
+        lastSavedPrefs.current = JSON.stringify({ themeColor: p.themeColor || "Warm Sunset", dailyGoals: p.dailyGoals || DEFAULT_GOALS, saveFoodPhotos: p.saveFoodPhotos !== undefined ? p.saveFoodPhotos : true });
       }
       preferencesLoaded.current = true; isInitialLoad.current = false;
     } catch (error) { Alert.alert("Error", getFirestoreErrorMessage(error)); preferencesLoaded.current = true; isInitialLoad.current = false; }
@@ -536,7 +594,11 @@ export default function App() {
     if (!netState.isConnected) {
       showDialog("No Internet", "An internet connection is required to analyze food.");
       return;
+      return;
     }
+
+    // Capture time immediately when processing starts (upload time)
+    const now = new Date();
 
     setIsProcessing(true); setProcessingStatus("Analyzing your food...");
     try {
@@ -546,7 +608,7 @@ export default function App() {
       let storagePath = null;
 
       if (saveFoodPhotos && user) {
-        setProcessingStatus("📤 Uploading photo...");
+        setProcessingStatus("Uploading photo...");
         try {
           // 2. Use URI for upload (Better Performance)
           // We use the URI from the image asset
@@ -560,7 +622,7 @@ export default function App() {
         }
       }
 
-      setProcessingStatus("💾 Saving...");
+      setProcessingStatus("Saving details...");
       await addMeals([{
         id: `${Date.now()}_${Math.random()}`,
         food_name: data.food_name,
@@ -574,8 +636,10 @@ export default function App() {
         sodium: data.sodium,
         serving_size: data.serving_size,
         confidence: data.confidence,
-        date: new Date().toISOString().slice(0, 10),
-        time: new Date().toISOString().slice(11, 16),
+        serving_size: data.serving_size,
+        confidence: data.confidence,
+        date: now.toISOString().slice(0, 10),
+        time: now.toISOString().slice(11, 16),
         photoUrl,
         storagePath // storing this for future deletion
       }]);
@@ -612,15 +676,7 @@ export default function App() {
     }]);
   }, [editItem]);
 
-  async function handleToggleReminders(val) {
-    if (val) {
-      const ok = await requestNotificationPermissions();
-      if (!ok) { showDialog("Permission Needed", "Enable notifications in device settings."); return; }
-      await scheduleFixedDailyReminders();
-    }
-    else { await cancelAllNotifications(); }
-    setRemindersEnabled(val); await setNotificationSettings({ enabled: val });
-  }
+
 
   async function handleDeleteAccount() {
     showDialog("Delete Account?", "This will permanently delete your account and all data. This cannot be undone.", [
@@ -649,22 +705,22 @@ export default function App() {
       <View style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
           {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.appTitle, { color: themeColors.text }]}>NutriSnap</Text>
+          <View style={[styles.header, { marginBottom: 12 }]}>
+            <GradientText text="NutriSnap" fontSize={26} colors={themeColors.gradient} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setScreen("goalPlanning")} hitSlop={8}>
-                <Text style={{ fontSize: 28 }}>🎯</Text>
+                <Target size={26} color="#EF4444" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setScreen("reports")} hitSlop={8}>
-                <Text style={{ fontSize: 24 }}>📊</Text>
+                <BarChart2 size={26} color="#8B5CF6" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setScreen("settings")} hitSlop={8}>
-                <Text style={{ fontSize: 24 }}>⚙️</Text>
+                <Settings size={26} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={{ color: themeColors.subText, fontSize: 13, paddingHorizontal: 16, marginTop: 6, marginBottom: 10 }}>{format(new Date(), "EEEE, MMM d")}</Text>
+
 
           {/* Today's Progress - tappable */}
           <TouchableOpacity activeOpacity={0.8} onPress={() => setShowNutritionModal(true)}>
@@ -699,10 +755,18 @@ export default function App() {
             <StreakCard currentStreak={streakData.currentStreak} bestStreak={streakData.bestStreak} themeColors={themeColors} onPress={() => setShowStreakModal(true)} />
           </View>
 
-          {/* Insights */}
-          {weeklyInsights.length > 0 && (
+
+          {showInsights && weeklyInsights.length > 0 && (
             <View style={[styles.insightsContainer, { backgroundColor: themeColors.card }]}>
-              <Text style={[styles.sectionLabel, { color: themeColors.text, marginLeft: 0, marginTop: 0 }]}>💡 Insights</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Lightbulb size={20} color="#F59E0B" style={{ marginRight: 8 }} />
+                  <Text style={[styles.sectionLabel, { color: themeColors.text, marginLeft: 0, marginTop: 0, marginBottom: 0 }]}>Insights</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowInsights(false)} hitSlop={8}>
+                  <X size={20} color={themeColors.subText} />
+                </TouchableOpacity>
+              </View>
               {weeklyInsights.map((insight, i) => (
                 <View key={i} style={[styles.insightRow, { backgroundColor: themeColors.chip }]}>
                   <Text style={[styles.insightText, { color: themeColors.text }]}>{insight.message}</Text>
@@ -715,15 +779,17 @@ export default function App() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterRow, { marginTop: 16 }]}>
             {DATE_FILTERS.map(f => <FilterChip key={f} label={f} selected={dateFilter === f} onPress={() => setDateFilter(f)} primaryColor={themeColors.primary} chipBg={themeColors.chip} textColor={themeColors.text} />)}
           </ScrollView>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-            <FilterChip label="🍽️ All" selected={mealTypeFilter === "All"} onPress={() => setMealTypeFilter("All")} primaryColor={themeColors.primary} chipBg={themeColors.chip} textColor={themeColors.text} />
-            {MEAL_TYPES.map(c => <FilterChip key={c} label={`${MEAL_TYPE_EMOJIS[c]} ${c}`} selected={mealTypeFilter === c} onPress={() => setMealTypeFilter(c)} primaryColor={themeColors.primary} chipBg={themeColors.chip} textColor={themeColors.text} />)}
-          </ScrollView>
+          <CategoryFilter
+            activeCategory={mealTypeFilter}
+            onCategoryPress={setMealTypeFilter}
+            categories={MEAL_FILTERS}
+            themeColors={themeColors}
+          />
 
           {/* Meals */}
           {filteredMeals.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 56 }}>📷</Text>
+              <UtensilsCrossed size={64} color={themeColors.chip} />
               <Text style={{ color: themeColors.subText, marginTop: 12, textAlign: 'center', fontSize: 14 }}>No meals yet</Text>
               <Text style={{ color: themeColors.subText, marginTop: 4, textAlign: 'center', fontSize: 13 }}>Snap a photo to get started</Text>
             </View>
@@ -783,13 +849,13 @@ export default function App() {
           <View style={styles.fabRow}>
             <TouchableOpacity style={styles.fabEqual} onPress={handleCameraCapture} disabled={isProcessing}>
               <LinearGradient colors={themeColors.gradient} style={styles.fabEqualInner}>
-                <Text style={{ fontSize: 15 }}>📷</Text>
+                <Camera size={24} color="#FFF" />
                 <Text style={styles.fabText}>Camera</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={styles.fabEqual} onPress={handleGalleryPick} disabled={isProcessing}>
               <LinearGradient colors={themeColors.gradient} style={styles.fabEqualInner}>
-                <Text style={{ fontSize: 15 }}>🖼️</Text>
+                <LucideImage size={24} color="#FFF" />
                 <Text style={styles.fabText}>Gallery</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -803,7 +869,7 @@ export default function App() {
   const SettingsScreen = () => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
       <View style={styles.settingsHeader}>
-        <TouchableOpacity onPress={() => setScreen("home")}><Text style={{ color: themeColors.primary, fontSize: 22, fontWeight: '600' }}>←</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setScreen("home")}><ArrowLeft size={24} color={themeColors.primary} /></TouchableOpacity>
         <Text style={[styles.settingsTitle, { color: themeColors.text }]}>Settings</Text>
         <View style={{ width: 50 }} />
       </View>
@@ -831,22 +897,12 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Photo + Reminders */}
+      {/* Media Settings */}
       <View style={[styles.card, { backgroundColor: themeColors.card }]}>
         <View style={styles.toggleRow}>
           <Text style={{ color: themeColors.text, fontWeight: '600', flex: 1 }}>Save Food Photos</Text>
           <TouchableOpacity style={[styles.toggleBtn, { backgroundColor: saveFoodPhotos ? themeColors.primary : themeColors.chip }]} onPress={() => setSaveFoodPhotos(!saveFoodPhotos)}>
             <Text style={{ color: saveFoodPhotos ? "#FFF" : themeColors.text, fontWeight: "600" }}>{saveFoodPhotos ? "ON" : "OFF"}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.divider, { backgroundColor: themeColors.chip }]} />
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: themeColors.text, fontWeight: '600' }}>Smart Reminders</Text>
-            <Text style={{ color: themeColors.subText, fontSize: 11 }}>Nudges to log meals throughout the day</Text>
-          </View>
-          <TouchableOpacity style={[styles.toggleBtn, { backgroundColor: remindersEnabled ? themeColors.primary : themeColors.chip }]} onPress={() => handleToggleReminders(!remindersEnabled)}>
-            <Text style={{ color: remindersEnabled ? "#FFF" : themeColors.text, fontWeight: "600" }}>{remindersEnabled ? "ON" : "OFF"}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -865,16 +921,19 @@ export default function App() {
 
       {/* Help & Legal */}
       <View style={[styles.card, { backgroundColor: themeColors.card }]}>
-        <TouchableOpacity style={{ paddingVertical: 10 }} onPress={() => setShowHowToUse(true)}>
-          <Text style={{ color: themeColors.text, fontWeight: '600' }}>📖 How to Use</Text>
+        <TouchableOpacity style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => setShowHowToUse(true)}>
+          <HelpCircle size={20} color={themeColors.text} style={{ marginRight: 10 }} />
+          <Text style={{ color: themeColors.text, fontWeight: '600' }}>How to Use</Text>
         </TouchableOpacity>
         <View style={[styles.divider, { backgroundColor: themeColors.chip }]} />
-        <TouchableOpacity style={{ paddingVertical: 10 }} onPress={() => setScreen("privacy")}>
-          <Text style={{ color: themeColors.text, fontWeight: '600' }}>🔒 Privacy Policy</Text>
+        <TouchableOpacity style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => setScreen("privacy")}>
+          <ShieldCheck size={20} color={themeColors.text} style={{ marginRight: 10 }} />
+          <Text style={{ color: themeColors.text, fontWeight: '600' }}>Privacy Policy</Text>
         </TouchableOpacity>
         <View style={[styles.divider, { backgroundColor: themeColors.chip }]} />
-        <TouchableOpacity style={{ paddingVertical: 10 }} onPress={() => setScreen("terms")}>
-          <Text style={{ color: themeColors.text, fontWeight: '600' }}>📄 Terms & Conditions</Text>
+        <TouchableOpacity style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => setScreen("terms")}>
+          <FileText size={20} color={themeColors.text} style={{ marginRight: 10 }} />
+          <Text style={{ color: themeColors.text, fontWeight: '600' }}>Terms & Conditions</Text>
         </TouchableOpacity>
         <View style={[styles.divider, { backgroundColor: themeColors.chip }]} />
         <View style={{ paddingVertical: 10 }}>
@@ -891,7 +950,7 @@ export default function App() {
           This will permanently delete your account and all data
         </Text>
       </View>
-    </ScrollView>
+    </ScrollView >
   );
 
   // ========== LOGIN ==========
@@ -929,8 +988,7 @@ export default function App() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, justifyContent: 'center', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={{ alignItems: 'center', marginBottom: 32 }}>
-            <Text style={{ fontSize: 40 }}>🥗</Text>
-            <Text style={[styles.appTitle, { color: themeColors.text, fontSize: 28, marginTop: 8 }]}>NutriSnap</Text>
+            <Image source={require('./assets/login_image.png')} style={{ width: 160, height: 160, borderRadius: 20 }} />
           </View>
 
           <View style={[styles.card, { backgroundColor: themeColors.card }]}>
@@ -953,9 +1011,9 @@ export default function App() {
             <Text style={[styles.inputLabel, { color: themeColors.text, marginTop: 12 }]}>Password</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TextInput value={password} onChangeText={setPassword} placeholder="Min. 6 characters" placeholderTextColor={themeColors.subText} secureTextEntry={!showPassword}
-                style={[styles.thinInput, { color: themeColors.text, borderColor: isDarkMode ? "#4B5563" : "#D1D5DB", flex: 1, paddingRight: 60 }]} />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 18 }}>
-                <Text style={{ color: themeColors.primary, fontSize: 13, fontWeight: '500' }}>{showPassword ? 'Hide' : 'Show'}</Text>
+                style={[styles.thinInput, { color: themeColors.text, borderColor: isDarkMode ? "#4B5563" : "#D1D5DB", flex: 1, paddingRight: 40 }]} />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 16 }}>
+                {showPassword ? <EyeOff size={20} color={themeColors.primary} /> : <Eye size={20} color={themeColors.primary} />}
               </TouchableOpacity>
             </View>
 
@@ -970,8 +1028,8 @@ export default function App() {
 
             {isSignUp && (
               <TouchableOpacity style={styles.termsRow} onPress={() => setAgreed(!agreed)}>
-                <View style={[styles.checkbox, { borderColor: themeColors.primary, backgroundColor: agreed ? themeColors.primary : 'transparent' }]}>
-                  {agreed && <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                <View style={[styles.checkbox, { borderColor: themeColors.primary, backgroundColor: agreed ? themeColors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }]}>
+                  {agreed && <Check size={12} color="#FFF" />}
                 </View>
                 <Text style={{ color: themeColors.subText, fontSize: 12, flex: 1 }}>
                   I agree to the <Text style={{ color: themeColors.primary }}>Privacy Policy</Text> and <Text style={{ color: themeColors.primary }}>Terms</Text>
@@ -979,7 +1037,8 @@ export default function App() {
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: themeColors.primary, marginTop: 20 }]} onPress={handleAuth} disabled={loading}>
+            <TouchableOpacity style={[styles.primaryBtn, { overflow: 'hidden', marginTop: 20 }]} onPress={handleAuth} disabled={loading}>
+              <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
               <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 16 }}>{loading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Sign In'}</Text>
             </TouchableOpacity>
 
@@ -995,15 +1054,14 @@ export default function App() {
           <View style={{ marginTop: 32, marginBottom: 16 }}>
             <Text style={{ color: themeColors.subText, fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 16 }}>What you can do with NutriSnap</Text>
             {[
-              { emoji: "📷", title: "AI Food Analysis", desc: "Snap a photo, get instant nutrition data" },
-              { emoji: "📊", title: "Track & Analyze", desc: "Charts, trends, and personalized insights" },
-              { emoji: "🎯", title: "Goal Planning", desc: "Custom calorie targets based on your goals" },
-              { emoji: "🔥", title: "Streaks & Scores", desc: "Stay motivated with daily health scores" },
-              { emoji: "🔔", title: "Smart Reminders", desc: "Never forget to log your meals" },
-              { emoji: "📈", title: "Weight Tracking", desc: "Monitor your progress over time" },
+              { icon: Camera, title: "AI Food Analysis", desc: "Snap a photo, get instant nutrition data", color: "#3B82F6" },
+              { icon: PieChartIcon, title: "Track & Analyze", desc: "Charts, trends, and personalized insights", color: "#8B5CF6" },
+              { icon: Target, title: "Goal Planning", desc: "Custom calorie targets based on your goals", color: "#EF4444" },
+              { icon: Trophy, title: "Streaks & Scores", desc: "Stay motivated with daily health scores", color: "#F59E0B" },
+              { icon: TrendingUp, title: "Weight Tracking", desc: "Monitor your progress over time", color: "#EC4899" },
             ].map((f, i) => (
               <View key={i} style={[styles.quickCard, { backgroundColor: themeColors.card }]}>
-                <Text style={{ fontSize: 28 }}>{f.emoji}</Text>
+                <f.icon size={28} color={f.color} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={{ color: themeColors.text, fontWeight: '600', fontSize: 15 }}>{f.title}</Text>
                   <Text style={{ color: themeColors.subText, fontSize: 12 }}>{f.desc}</Text>
@@ -1051,8 +1109,8 @@ export default function App() {
                 screen === "login" ? <LoginScreen /> :
                   screen === "reports" ? <ReportsScreen meals={meals} dailyGoals={dailyGoals} themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} /> :
                     screen === "goalPlanning" ? <GoalPlanningScreen themeColors={themeColors} isDarkMode={isDarkMode} onBack={() => setScreen("home")} dailyGoals={dailyGoals} onUpdateGoals={handleUpdateGoals} setDailyGoals={setDailyGoals} /> :
-                      screen === "privacy" ? <PrivacyPolicyScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
-                        screen === "terms" ? <TermsScreen themeColors={themeColors} onBack={() => setScreen("settings")} /> :
+                      screen === "privacy" ? <PrivacyPolicyScreen themeColors={themeColors} onBack={() => setScreen(user ? "settings" : "login")} /> :
+                        screen === "terms" ? <TermsScreen themeColors={themeColors} onBack={() => setScreen(user ? "settings" : "login")} /> :
                           SettingsScreen()}
 
               <EditModal visible={editModal} editItem={editItem} setEditItem={setEditItem} onClose={handleCloseEditModal} onSave={saveEdit} onDelete={deleteMeal} themeColors={themeColors} isDarkMode={isDarkMode} />

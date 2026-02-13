@@ -12,6 +12,7 @@ import {
     Platform,
 } from "react-native";
 import { Text } from "react-native-paper";
+import { ArrowLeft, X } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { LineChart, PieChart, BarChart } from "react-native-chart-kit";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -102,6 +103,8 @@ const EmptyState = ({ themeColors }) => (
 // AI SUGGESTIONS SECTION
 // ============================================================================
 const NutritionSuggestions = ({ meals, dailyGoals, periodMeals, themeColors }) => {
+    const [visible, setVisible] = useState(true);
+
     const suggestions = useMemo(() => {
         if (periodMeals.length < 3) return [];
 
@@ -200,7 +203,7 @@ const NutritionSuggestions = ({ meals, dailyGoals, periodMeals, themeColors }) =
         return result.slice(0, 5);
     }, [periodMeals, dailyGoals]);
 
-    if (suggestions.length === 0) return null;
+    if (!visible || suggestions.length === 0) return null;
 
     const typeColors = {
         success: "#10B981",
@@ -210,10 +213,17 @@ const NutritionSuggestions = ({ meals, dailyGoals, periodMeals, themeColors }) =
 
     return (
         <View style={[styles.chartCard, { backgroundColor: themeColors.card }]}>
-            <Text style={[styles.chartTitle, { color: themeColors.text }]}>Nutrition Suggestions</Text>
-            <Text style={{ color: themeColors.subText, fontSize: 12, marginBottom: 12 }}>
-                Based on your eating patterns
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View>
+                    <Text style={[styles.chartTitle, { color: themeColors.text, marginBottom: 0 }]}>Nutrition Suggestions</Text>
+                    <Text style={{ color: themeColors.subText, fontSize: 12 }}>
+                        Based on your eating patterns
+                    </Text>
+                </View>
+                <TouchableOpacity onPress={() => setVisible(false)} hitSlop={8}>
+                    <X size={20} color={themeColors.subText} />
+                </TouchableOpacity>
+            </View>
             {suggestions.map((s, i) => (
                 <View key={i} style={[styles.suggestionCard, { backgroundColor: themeColors.chip }]}>
                     <View style={[styles.suggestionDot, { backgroundColor: typeColors[s.type] }]} />
@@ -252,7 +262,7 @@ export default function ReportsScreen({
                 try {
                     const d = parseISO(m?.date);
                     return (isAfter(d, start) || format(d, 'yyyy-MM-dd') === format(start, 'yyyy-MM-dd')) &&
-                           (isBefore(d, end) || format(d, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd'));
+                        (isBefore(d, end) || format(d, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd'));
                 } catch {
                     return false;
                 }
@@ -497,10 +507,12 @@ export default function ReportsScreen({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+
+
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <Text style={[styles.backText, { color: themeColors.primary, fontSize: 22 }]}>←</Text>
+                        <ArrowLeft size={24} color={themeColors.primary} />
                     </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: themeColors.text }]}>
                         Reports
@@ -554,9 +566,10 @@ export default function ReportsScreen({
                                 />
                                 {Platform.OS === "ios" && (
                                     <TouchableOpacity
-                                        style={[styles.doneDateBtn, { backgroundColor: themeColors.primary }]}
+                                        style={[styles.doneDateBtn, { overflow: 'hidden' }]}
                                         onPress={() => setPickingDate(null)}
                                     >
+                                        <LinearGradient colors={themeColors.gradient} style={StyleSheet.absoluteFill} />
                                         <Text style={{ color: "#FFF", fontWeight: "600" }}>Done</Text>
                                     </TouchableOpacity>
                                 )}
